@@ -1,5 +1,5 @@
 # StreamBotAPI
-StreamBotAPI is a Python package that provides a simple Flask-based API for interacting with the StreamBot chatbot from OpenAI.
+StreamBotAPI is a Python package that provides a simple Flask-based API for interacting with the StreamBot which is a wrapper of OpenAI's ChatGPT.
 
 ## Installation
 StreamBotAPI can be installed using pip:
@@ -9,7 +9,7 @@ pip install streambot-api
 ```
 
 ## Usage
-To use StreamBotAPI, first initialize an instance of the StreamBot class from the streambot package:
+To use StreamBotAPI, first initialize an instance of the StreamBot class from the [streambot](https://pypi.org/project/streambot) package:
 
 ```python
 from streambot import StreamBot
