@@ -35,7 +35,8 @@ class StreamBotAPI:
         if connection_id in self.messages:
             return jsonify(self.messages[connection_id])
         else:
-            return jsonify([])
+            self.messages[connection_id] = self.streambot.messages
+            return jsonify(self.messages[connection_id])
 
     def handle_messages(self):
         connection_id = request.json.get('connection_id')
