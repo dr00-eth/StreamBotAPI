@@ -49,8 +49,6 @@ class StreamBotAPI:
         self.app.route('/api/addmessages', methods=['POST'])(self.add_messages)
 
     def chat_stream(self, messages, context_id):
-        print(f'Context ID: {context_id}')
-        print(self.streambots[int(context_id)].messages)
         for event in self.streambots[int(context_id)].chat_stream(messages):
             yield event
 
@@ -110,9 +108,6 @@ class StreamBotAPI:
             self.logger.info(f'{user_id} reset chat to Context {context_id}')
         if connection_id in self.messages:
             self.messages[connection_id] = self.streambots[int(context_id)].messages.copy()
-            if self.verbosity >= 1:
-                print(f"{connection_id} messages: {self.messages[connection_id]}")
-                print(f"{context_id} messages: {self.streambots[int(context_id)].messages}")
         return jsonify(True)
 
     def start(self):
