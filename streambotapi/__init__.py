@@ -1,43 +1,37 @@
 import os
 import logging
+import eventlet
+eventlet.monkey_patch(socket=True)
 from flask import Flask, jsonify, request
 from flask_socketio import SocketIO
 from flask_cors import CORS
 from streambot import StreamBot
+from logtail import LogtailHandler
 
 class StreamBotAPI:
-    def __init__(self, streambots, host='0.0.0.0', port=80, origins=['*'], verbosity = 0, log_file=None, debug=False):
+    def __init__(self, streambots, host='0.0.0.0', port=80, origins=['*'], verbosity = 0, debug=False, logtail_key=None):
         self.host = host
         self.port = port
         self.streambots = streambots
         self.origins = origins
         self.verbosity = verbosity
-        self.log_file = log_file
         self.debug = debug
+        self.logtail_key = logtail_key
 
         self.app = Flask(__name__)
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*", websocket=True, log_output=False)
+        self.socketio = SocketIO(self.app, async_mode="eventlet", cors_allowed_origins="*", websocket=True, log_output=self.debug)
         self.init_cors()
         self.init_routes()
 
         self.messages = {}
 
-        # Configure logging
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
-
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-        if self.log_file:
-            file_handler = logging.FileHandler(self.log_file)
-            file_handler.setLevel(logging.DEBUG)
-            file_handler.setFormatter(formatter)
-            self.logger.addHandler(file_handler)
-
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)
+        if self.logtail_key:
+            self.handler = LogtailHandler(source_token=logtail_key)
+            self.logger = logging.getLogger(__name__)
+            self.logger.setLevel(logging.INFO)
+            self.logger.handlers = []
+            self.logger.addHandler(self.handler)
+        
 
     def init_cors(self):
         CORS(self.app, resources={r"/api/*": {"origins": self.origins}})
@@ -65,21 +59,32 @@ class StreamBotAPI:
         user_id = request.json.get('user_id')
         connection_id = f"{context_id}_{user_id}"
         message = request.json.get('message')
-        if self.verbosity >= 1:
-            self.logger.info(f'{connection_id} added: {message}')
         if connection_id in self.messages:
             self.messages[connection_id].append({"role": "user", "content": message})
         else:
             self.messages[connection_id] = [{"role": "user", "content": message}]
+        
+        def emit_callback():
+            response = ""
+            for event in self.chat_stream(self.messages[connection_id], context_id=context_id):
+                response += event
+                self.socketio.emit('message', {'message': event, 'connection_id': connection_id}, room=user_id, broadcast=True)
+            self.messages[connection_id].append({"role": "assistant", "content": response})
+            if self.verbosity >= 1:
+                self.logger.info(f'{connection_id} message array', extra={
+                    self.messages[connection_id]
+                })
 
-        response = ""
+            return jsonify(self.messages[connection_id])
+        
+        self.socketio.emit('emit_event', callback=emit_callback, room=user_id)
 
-        for event in self.chat_stream(self.messages[connection_id], context_id=context_id):
-            response += event
-            self.socketio.emit('message', {'message': event, 'connection_id': connection_id}, room=user_id, broadcast=True)
+        @self.socketio.on('callback_event')
+        def handle_callback_event(data):
+            # call the emit_callback() function to complete the loop
+            emit_callback()
 
-        self.messages[connection_id].append({"role": "assistant", "content": response})
-        return jsonify(self.messages[connection_id])
+        return 'OK', 200
     
     def add_messages(self):
         #use this method to add messages without triggering ChatGPT response
@@ -88,9 +93,6 @@ class StreamBotAPI:
         connection_id = f"{context_id}_{user_id}"
         message = request.json.get('message')
         role = request.json.get('role')
-
-        if self.verbosity >= 1:
-            self.logger.info(f'{connection_id} added: {message} to {role}')
 
         if connection_id in self.messages:
             self.messages[connection_id].append({"role":role,"content":message})
@@ -113,4 +115,4 @@ class StreamBotAPI:
     def start(self):
         if self.verbosity >= 1:
             self.logger.info(f'server started on {self.host} on port {self.port}')
-        self.app.run(host=self.host, port=self.port, debug=self.debug, log_output=False)
+        self.socketio.run(self.app, host=self.host, port=self.port, debug=self.debug, log_output=self.debug)

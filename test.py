@@ -1,13 +1,34 @@
 from streambotapi import StreamBotAPI
 from streambot import StreamBot
+import constants
 import os
+import logging
 
-streambot1 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt="You are a helpful french translation assistant.")
-streambot1.add_message("That's great, please only respond to english to french translation and reject any other requests.")
+# Create a logger object
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
-streambot2 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt="You are a helpful spanish translation assistant.")
-streambot2.add_message("That's great, please only respond to english to spanish translation and reject any other requests.")
+file_handler = logging.FileHandler('your_log_file.log')
+file_handler.setLevel(logging.DEBUG)
 
-api = StreamBotAPI([streambot1, streambot2], port=8008)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+
+#Prompt 0 - Listing Bot
+streambot1 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt=constants.OPENAI_PROMPT[0])
+
+#Prompt 1 - Neighborhood Bot
+streambot2 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt=constants.OPENAI_PROMPT[1])
+
+#Prompt 2 - Coaching Bot
+streambot3 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt=constants.OPENAI_PROMPT[2])
+
+#Prompt 3 - Follow Up Bot
+streambot4 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt=constants.OPENAI_PROMPT[3])
+
+
+api = StreamBotAPI([streambot1,streambot2, streambot3, streambot4], origins=["http://localhost:3000","https://paisley-ui-hycvm.ondigitalocean.app"], verbosity=1, debug=True, port=8008)
 
 server = api.start()
