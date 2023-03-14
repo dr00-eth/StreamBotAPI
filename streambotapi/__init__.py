@@ -70,10 +70,10 @@ class StreamBotAPI:
                 response += event
                 self.socketio.emit('message', {'message': event, 'connection_id': connection_id}, room=user_id, broadcast=True)
             self.messages[connection_id].append({"role": "assistant", "content": response})
-            if self.verbosity >= 1:
-                self.logger.info(f'{connection_id} message array', extra={
-                    self.messages[connection_id]
-                })
+            # if self.verbosity >= 1:
+                # self.logger.info(f'{connection_id} message array', extra={
+                #     self.messages[connection_id]
+                # })
 
             return jsonify(self.messages[connection_id])
         
@@ -106,13 +106,13 @@ class StreamBotAPI:
         context_id = request.json.get('context_id')
         user_id = request.json.get('user_id')
         connection_id = f"{context_id}_{user_id}"
-        if self.verbosity >= 1:
-            self.logger.info(f'{user_id} reset chat to Context {context_id}')
+        # if self.verbosity >= 1:
+        #     self.logger.info(f'{user_id} reset chat to Context {context_id}')
         if connection_id in self.messages:
             self.messages[connection_id] = self.streambots[int(context_id)].messages.copy()
         return jsonify(True)
 
     def start(self):
-        if self.verbosity >= 1:
-            self.logger.info(f'server started on {self.host} on port {self.port}')
+        # if self.verbosity >= 1:
+        #     self.logger.info(f'server started on {self.host} on port {self.port}')
         self.socketio.run(self.app, host=self.host, port=self.port, debug=self.debug, log_output=self.debug)
