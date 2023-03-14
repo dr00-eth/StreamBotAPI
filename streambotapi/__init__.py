@@ -16,7 +16,7 @@ class StreamBotAPI:
         self.debug = debug
 
         self.app = Flask(__name__)
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*", websocket=True)
+        self.socketio = SocketIO(self.app, cors_allowed_origins="*", websocket=True, log_output=False)
         self.init_cors()
         self.init_routes()
 
@@ -113,4 +113,4 @@ class StreamBotAPI:
     def start(self):
         if self.verbosity >= 1:
             self.logger.info(f'server started on {self.host} on port {self.port}')
-        self.app.run(host=self.host, port=self.port, debug=self.debug)
+        self.app.run(host=self.host, port=self.port, debug=self.debug, log_output=False)
