@@ -29,6 +29,6 @@ streambot3 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt=consta
 streambot4 = StreamBot(os.getenv('OPENAI_KEY'), "Paisley", genesis_prompt=constants.OPENAI_PROMPT[3])
 
 
-api = StreamBotAPI([streambot1,streambot2, streambot3, streambot4], origins=["http://localhost:3000","https://paisley-ui-hycvm.ondigitalocean.app"], verbosity=1, debug=True, port=8008)
+api = StreamBotAPI([streambot1,streambot2, streambot3, streambot4], origins=["http://localhost:3000","https://paisley-ui-hycvm.ondigitalocean.app"], verbosity=1, debug=True, port=8008, allow_model_override=True)
 
 server = api.start()
