@@ -83,7 +83,7 @@ class StreamBotAPI:
         context_id = request.json.get('context_id')
         user_id = request.json.get('user_id')
         connection_id = f"{context_id}_{user_id}"
-        if self.allow_model_override:
+        if self.allow_model_override and request.json.get('model'):
             model = request.json.get('model')
             self.streambots[int(context_id)].model = model
         message = request.json.get('message')
