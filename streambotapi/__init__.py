@@ -6,6 +6,7 @@ from flask import Flask, jsonify, request
 from flask_socketio import SocketIO
 from flask_cors import CORS
 from streambot import StreamBot
+import tiktoken
 import json
 
 class StreamBotAPI:
@@ -64,6 +65,7 @@ class StreamBotAPI:
         self.app.route('/api/messages', methods=['POST'])(self.handle_messages)
         self.app.route('/api/newchat', methods=['POST'])(self.reset_chat)
         self.app.route('/api/addmessages', methods=['POST'])(self.add_messages)
+        self.app.route('/api/gettokencount', methods=['POST'])(self.get_tokens)
 
     def chat_stream(self, messages, context_id):
         for event in self.streambots[int(context_id)].chat_stream(messages):
@@ -79,6 +81,27 @@ class StreamBotAPI:
                 self.logger.info(f'{user_id} got init messages for {context_id}', extra={'extra':{'messages': json.dumps(self.messages[connection_id])}})
             return jsonify(self.messages[connection_id])
 
+    def get_tokens(self):
+        messages = request.json.get('messages')
+        model = request.json.get('model')
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+        if model == "gpt-3.5-turbo":  # note: future models may deviate from this
+            num_tokens = 0
+            for message in messages:
+                num_tokens += 4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
+                for key, value in message.items():
+                    num_tokens += len(encoding.encode(value))
+                    if key == "name":  # if there's a name, the role is omitted
+                        num_tokens += -1  # role is always required and always 1 token
+            num_tokens += 2  # every reply is primed with <im_start>assistant
+            return jsonify({"tokencounts": num_tokens})
+        else:
+            raise NotImplementedError(f"""num_tokens_from_messages() is not presently implemented for model {model}.
+        See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
+
     def handle_messages(self):
         context_id = request.json.get('context_id')
         user_id = request.json.get('user_id')
@@ -93,25 +116,34 @@ class StreamBotAPI:
             self.messages[connection_id] = [{"role": "user", "content": message}]
         if self.verbosity >= 1:
             self.logger.info(f'{user_id} added message', extra={'extra':{"role": "user", "content": message}})
-        def emit_callback():
+        
+        def emit_callback(messages = None):
             response = ""
-            for event in self.chat_stream(self.messages[connection_id], context_id=context_id):
+            if messages:
+                chat = messages
+            else:
+                chat = self.messages[connection_id]
+            for event in self.chat_stream(chat, context_id=context_id):
                 response += event
                 self.socketio.emit('message', {'message': event, 'connection_id': connection_id}, room=user_id, broadcast=True)
             self.messages[connection_id].append({"role": "assistant", "content": response})
             if self.verbosity >= 1:
                 self.logger.info(f'{user_id} added message', extra={'extra':{"role": "assistant", "content": response}})
-            self.socketio.emit('message_complete', {'message_completed': True, 'connection_id': connection_id}, room=user_id, broadcast=True)
+            self.socketio.emit('message_complete', {'message_completed': True, 'connection_id': connection_id, 'message': response}, room=user_id, broadcast=True)
             return jsonify(self.messages[connection_id])
         
         self.socketio.emit('emit_event', callback=emit_callback, room=user_id)
 
         @self.socketio.on('callback_event')
         def handle_callback_event(data):
+            if data is not None and 'messages' in data:
+                messages = data['messages']
+                emit_callback(messages)
             # call the emit_callback() function to complete the loop
             emit_callback()
 
         return 'OK', 200
+
     
     def add_messages(self):
         #use this method to add messages without triggering ChatGPT response
